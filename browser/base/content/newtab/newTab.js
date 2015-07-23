@@ -36,6 +36,31 @@ function inPrivateBrowsingMode() {
   return PrivateBrowsingUtils.isContentWindowPrivate(window);
 }
 
+function initRemotePage() {
+  // Messages that the iframe sends the browser will be passed onto
+  // the privileged parent process
+  let iframe = document.getElementById("meep").contentDocument;
+  iframe.addEventListener("NewTabCommand", (e) => {
+    sendAsyncMessage(e.detail.command, e.detail.data);
+  }, false);
+}
+
+function registerEvents() {
+  // Messages that the privileged parent process sends will be passed
+  // onto the iframe
+  for (let event of REGISTERED_EVENTS) {
+    addMessageListener(event, (message) => {
+      let iframe = document.getElementById("meep").contentWindow;
+      iframe.postMessage(message, "*");
+    });
+  }
+}
+
+function init() {
+  registerEvents();
+  initRemotePage();
+}
+
 const HTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 const XUL_NAMESPACE = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
@@ -44,20 +69,9 @@ const TILES_INTRO_LINK = "https://www.mozilla.org/firefox/tiles/";
 const TILES_PRIVACY_LINK = "https://www.mozilla.org/privacy/";
 
 #include transformations.js
-#include page.js
-#include grid.js
-#include cells.js
-#include sites.js
-#include drag.js
-#include dragDataHelper.js
-#include drop.js
-#include dropTargetShim.js
-#include dropPreview.js
-#include updater.js
-#include undo.js
-#include search.js
-#include customize.js
-#include intro.js
+const REGISTERED_EVENTS = ["NewTab:FetchLinks", "NewTab:URI", "NewTab:UpdatePages",
+                           "NewTab:Observe", "NewTab:PinState", "NewTab:BlockState",
+                           "NewTab:Restore"];
 
 // Everything is loaded. Initialize the New Tab Page.
-gPage.init();
+init();

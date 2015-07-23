@@ -12,6 +12,7 @@ this.EXPORTED_SYMBOLS = [ "AboutNewTab" ];
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource:///modules/DirectoryLinksProvider.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "RemotePages",
   "resource://gre/modules/RemotePageManager.jsm");
@@ -41,6 +42,9 @@ let AboutNewTab = {
     this.pageListener.addMessageListener("NewTab:BackgroundPageThumbs", this.backgroundPageThumbs.bind(this));
     this.pageListener.addMessageListener("NewTab:PageThumbs", this.pageThumbs.bind(this));
     this.pageListener.addMessageListener("NewTab:IntroPrefs", this.updateIntroPrefs.bind(this));
+    this.pageListener.addMessageListener("NewTab:SpeculativeConnect", this.speculativeConnect.bind(this));
+    this.pageListener.addMessageListener("NewTab:ReportSitesAction", this.reportSitesAction.bind(this));
+    this.pageListener.addMessageListener("NewTab:RecordSiteClicked", this.recordSiteClicked.bind(this));
 
     this._addObservers();
 
@@ -136,6 +140,40 @@ let AboutNewTab = {
   updateIntroPrefs: function(message) {
     Services.prefs.setBoolPref("browser.newtabpage.introShown", message.data.introShown);
     Services.prefs.setBoolPref("browser.newtabpage.updateIntroShown", message.data.updateIntroShown);
+  },
+
+  /**
+   * Speculatively opens a connection to the given site.
+   */
+  speculativeConnect: function (message) {
+    let sc = Services.io.QueryInterface(Ci.nsISpeculativeConnect);
+    let uri = Services.io.newURI(message.data.url, null, null);
+    sc.speculativeConnect(uri, null);
+  },
+
+  reportSitesAction: function(message) {
+    // Convert sites to objects.
+    for (let i = 0; i < message.data.sites.length; i++) {
+      let site = message.data.sites[i];
+      message.data.sites[i] = JSON.parse(site);
+    }
+
+    DirectoryLinksProvider.reportSitesAction(message.data.sites, message.data.action, message.data.index);
+  },
+
+  /**
+   * Record interaction with site using telemetry.
+   */
+  recordSiteClicked: function(message) {
+    let index = parseInt(message.data.index);
+    if (Services.prefs.prefHasUserValue("browser.newtabpage.rows") ||
+        Services.prefs.prefHasUserValue("browser.newtabpage.columns") ||
+        index > 8) {
+      // We only want to get indices for the default configuration, everything
+      // else goes in the same bucket.
+      index = 9;
+    }
+    Services.telemetry.getHistogramById("NEWTAB_PAGE_SITE_CLICKED").add(index);
   },
 
   observe: function(aSubject, aTopic, aData) {
