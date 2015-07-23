@@ -100,9 +100,13 @@ let AboutNewTab = {
   },
 
   unblock: function(message) {
+    if (message.data.pinned) {
+      this.pinLink(message);
+    }
+
     let link = message.data.link;
     NewTabUtils.blockedLinks.unblock(link);
-    message.target.sendAsyncMessage("NewTab:BlockState", {blockState: NewTabUtils.blockedLinks.isBlocked(message.data.link)});
+    message.target.sendAsyncMessage("NewTab:BlockState", {blockState: NewTabUtils.blockedLinks.isBlocked(message.data.link), link: link});
     this.updatePages(message);
   },
 
