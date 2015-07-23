@@ -13,14 +13,22 @@ const SCHEDULE_UPDATE_TIMEOUT_MS = 1000;
  */
 let gPage = {
   /**
+   * The page's unique window ID.
+   */
+  get windowID() {
+    return window.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindowUtils).outerWindowID;
+  },
+
+  /**
    * Initializes the page.
    */
   init: function Page_init() {
-    // Add ourselves to the list of pages to receive notifications.
-    gAllPages.register(this);
-
-    // Listen for 'unload' to unregister this page.
-    addEventListener("unload", this, false);
+    addMessageListener("NewTab:UpdatePages", this.update.bind(this));
+    addMessageListener("NewTab:Observe", (message) => {
+      this.observe(message.data.topic, message.data.data);
+    });
+    addMessageListener("NewTab:PinState", this.setPinState.bind(this));
+    addMessageListener("NewTab:BlockState", this.setBlockState.bind(this));
 
     // XXX bug 991111 - Not all click events are correctly triggered when
     // listening from xhtml nodes -- in particular middle clicks on sites, so
@@ -28,7 +36,7 @@ let gPage = {
     addEventListener("click", this, false);
 
     // Check if the new tab feature is enabled.
-    let enabled = gAllPages.enabled;
+    let enabled = Services.prefs.getBoolPref("browser.newtabpage.enabled");
     if (enabled)
       this._init();
 
@@ -44,16 +52,15 @@ let gPage = {
   /**
    * Listens for notifications specific to this page.
    */
-  observe: function Page_observe(aSubject, aTopic, aData) {
-    if (aTopic == "nsPref:changed") {
+  observe: function Page_observe(aTopic, aData) {
+    if (aTopic== "nsPref:changed") {
       gCustomize.updateSelected();
 
-      let enabled = gAllPages.enabled;
+      let enabled = Services.prefs.getBoolPref("browser.newtabpage.enabled");
       this._updateAttributes(enabled);
 
-      // Update thumbnails to the new enhanced setting
+      // Show intro if necessary.
       if (aData == "browser.newtabpage.enhanced") {
-        this.update();
         gIntro.showIfNecessary();
       }
 
@@ -80,16 +87,24 @@ let gPage = {
    * a page update. The page may decide to delay or prevent a requested updated
    * based on the given reason.
    */
-  update(reason = "") {
+  update(message, reason = "") {
+    let currentWindowID = this.windowID;
+    let outerWindowID = message.data.outerWindowID;
+
+    // Do not refresh the entire grid for the page we're on, as refreshing will
+    // cause tiles to flash briefly. It is ok to refresh pages not currently visible
+    // but ignore updates for the currently visible page.
+    if (currentWindowID == outerWindowID) {
+      return;
+    }
     // Update immediately if we're visible.
     if (!document.hidden) {
       // Ignore updates where reason=links-changed as those signal that the
       // provider's set of links changed. We don't want to update visible pages
       // in that case, it is ok to wait until the user opens the next tab.
       if (reason != "links-changed" && gGrid.ready) {
-        gGrid.refresh();
+        gGrid.refresh(message);
       }
-
       return;
     }
 
@@ -101,7 +116,7 @@ let gPage = {
     this._scheduleUpdateTimeout = setTimeout(() => {
       // Refresh if the grid is ready.
       if (gGrid.ready) {
-        gGrid.refresh();
+        gGrid.refresh(message);
       }
 
       this._scheduleUpdateTimeout = null;
@@ -189,9 +204,6 @@ let gPage = {
       case "load":
         this.onPageVisibleAndLoaded();
         break;
-      case "unload":
-        this._handleUnloadEvent();
-        break;
       case "click":
         let {button, target} = aEvent;
         // Go up ancestors until we find a Site or not
@@ -204,11 +216,11 @@ let gPage = {
         }
         break;
       case "dragover":
-        if (gDrag.isValid(aEvent) && gDrag.draggedSite)
+        if (gDrag.draggedSite)
           aEvent.preventDefault();
         break;
       case "drop":
-        if (gDrag.isValid(aEvent) && gDrag.draggedSite) {
+        if (gDrag.draggedSite) {
           aEvent.preventDefault();
           aEvent.stopPropagation();
         }
@@ -285,5 +297,21 @@ let gPage = {
     }
 
     DirectoryLinksProvider.reportSitesAction(sites, "view", lastIndex);
-  }
+  },
+
+  setPinState: function Page_setPinState(message) {
+    for (let site of gGrid.sites) {
+      if (site._link.url == message.data.link.url) {
+        site._link.pinState = message.data.pinState
+      }
+    }
+  },
+
+  setBlockState: function Page_setBlockState(message) {
+    for (let site of gGrid.sites) {
+      if (site._link.url == message.data.link.url) {
+        link.blockState = message.data.blockState
+      }
+    }
+  },
 };

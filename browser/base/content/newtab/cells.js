@@ -103,9 +103,6 @@ Cell.prototype = {
     if (inPrivateBrowsingMode() && !gDrag.draggedSite)
       return;
 
-    if (aEvent.type != "dragexit" && !gDrag.isValid(aEvent))
-      return;
-
     switch (aEvent.type) {
       case "dragenter":
         aEvent.preventDefault();

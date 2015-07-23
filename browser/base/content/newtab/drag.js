@@ -102,25 +102,6 @@ let gDrag = {
   },
 
   /**
-   * Checks whether we're responsible for a given drag event.
-   * @param aEvent The drag event to check.
-   * @return Whether we should handle this drag and drop operation.
-   */
-  isValid: function Drag_isValid(aEvent) {
-    let link = gDragDataHelper.getLinkFromDragEvent(aEvent);
-
-    // Check that the drag data is non-empty.
-    // Can happen when dragging places folders.
-    if (!link || !link.url) {
-      return false;
-    }
-
-    // Check that we're not accepting URLs which would inherit the caller's
-    // principal (such as javascript: or data:).
-    return gLinkChecker.checkLoadURI(link.url);
-  },
-
-  /**
    * Initializes the drag data for the current drag operation.
    * @param aSite The site that's being dragged.
    * @param aEvent The 'dragstart' event.

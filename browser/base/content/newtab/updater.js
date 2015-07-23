@@ -10,12 +10,19 @@
  */
 let gUpdater = {
   /**
+   * Set up message listener to fetch links when the grid needs to be updated.
+   */
+  init: function Updater_init() {
+    addMessageListener("NewTab:FetchLinks", this.updateGrid.bind(this));
+  },
+
+  /**
    * Updates the current grid according to its pinned and blocked sites.
    * This removes old, moves existing and creates new sites to fill gaps.
-   * @param aCallback The callback to call when finished.
+   * @param message The links sent down by the parent process
    */
-  updateGrid: function Updater_updateGrid(aCallback) {
-    let links = gLinks.getLinks().slice(0, gGrid.cells.length);
+  updateGrid: function Updater_updateGrid(message) {
+    let links = message.data.links.slice(0, gGrid.cells.length);
 
     // Find all sites that remain in the grid.
     let sites = this._findRemainingSites(links);
@@ -33,14 +40,18 @@ let gUpdater = {
 
       // Now it's time to animate the sites actually moving to their new
       // positions.
-      this._rearrangeSites(sites, () => {
+      this._rearrangeSites(sites, (aCallback) => {
         // Try to fill empty cells and finish.
         this._fillEmptyCells(links, aCallback);
-
-        // Update other pages that might be open to keep them synced.
-        gAllPages.update(gPage);
       });
     });
+  },
+
+  /**
+   * Sends a message to update the grid.
+   */
+  sendUpdate: function Updater_sendUpdate() {
+    sendAsyncMessage("NewTab:UpdateGrid");
   },
 
   /**
@@ -175,3 +186,5 @@ let gUpdater = {
     })).then(aCallback).catch(console.exception);
   }
 };
+
+gUpdater.init();

@@ -115,19 +115,22 @@ let gDropPreview = {
 
     // We need a pinned range only when dropping on a pinned site.
     if (aCell.containsPinnedSite()) {
-      let links = gPinnedLinks.links;
+      sendAsyncMessage("NewTab:GetPinRange");
+      addMessageListener("NewTab:FetchLinks", (message) => {
+        removeEventListener("NewTab:FetchLinks", this);
+        let links = message.data.links;
 
-      // Find all previous siblings of the drop target that are pinned as well.
-      while (range.start && links[range.start - 1])
-        range.start--;
+        // Find all previous siblings of the drop target that are pinned as well.
+        while (range.start && links[range.start - 1])
+          range.start--;
 
-      let maxEnd = links.length - 1;
+        let maxEnd = links.length - 1;
 
-      // Find all next siblings of the drop target that are pinned as well.
-      while (range.end < maxEnd && links[range.end + 1])
-        range.end++;
+        // Find all next siblings of the drop target that are pinned as well.
+        while (range.end < maxEnd && links[range.end + 1])
+          range.end++;
+      });
     }
-
     return range;
   },
 

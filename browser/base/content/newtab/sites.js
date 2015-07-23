@@ -55,18 +55,18 @@ Site.prototype = {
     if (typeof aIndex == "undefined")
       aIndex = this.cell.index;
 
+    sendAsyncMessage("NewTab:PinLink", {link: this._link, index: aIndex});
     this._updateAttributes(true);
-    gPinnedLinks.pin(this._link, aIndex);
   },
 
   /**
-   * Unpins the site and calls the given callback when done.
+   * Unpins the site.
    */
   unpin: function Site_unpin() {
     if (this.isPinned()) {
+      sendAsyncMessage("NewTab:UnpinLink", {link: this._link});
       this._updateAttributes(false);
-      gPinnedLinks.unpin(this._link);
-      gUpdater.updateGrid();
+     // gUpdater.sendUpdate();
     }
   },
 
@@ -75,7 +75,7 @@ Site.prototype = {
    * @return Whether this site is pinned.
    */
   isPinned: function Site_isPinned() {
-    return gPinnedLinks.isPinned(this._link);
+    return this._link.pinState;
   },
 
   /**
@@ -83,11 +83,19 @@ Site.prototype = {
    * when done.
    */
   block: function Site_block() {
-    if (!gBlockedLinks.isBlocked(this._link)) {
+    if (!this.isBlocked()) {
       gUndoDialog.show(this);
-      gBlockedLinks.block(this._link);
-      gUpdater.updateGrid();
+      sendAsyncMessage("NewTab:BlockLink", {link: this._link});
+      gUpdater.sendUpdate();
     }
+  },
+
+  /**
+   * Checks whether this site is blocked.
+   * @return Whether this site is blocked.
+   */
+  isBlocked: function Site_isBlocked() {
+    return this._link.blockState;
   },
 
   /**
@@ -151,7 +159,7 @@ Site.prototype = {
        delete this.link.endTime;
        // clear enhanced-content image that may still exist in preloaded page
        this._querySelector(".enhanced-content").style.backgroundImage = "";
-       gPinnedLinks.replace(oldUrl, this.link);
+       sendAsyncMessage("NewTab:ReplacePinLink", {oldUrl: oldUrl, link: this.link});
     }
   },
 
@@ -162,7 +170,8 @@ Site.prototype = {
     // first check for end time, as it may modify the link
     this._checkLinkEndTime();
     // setup display variables
-    let enhanced = gAllPages.enhanced && DirectoryLinksProvider.getEnhancedLink(this.link);
+    let enhanced = Services.prefs.getBoolPref("browser.newtabpage.enhanced")
+                    && DirectoryLinksProvider.getEnhancedLink(this.link);
     let url = this.url;
     let title = enhanced && enhanced.title ? enhanced.title :
                 this.link.type == "history" ? this.link.baseDomain :
@@ -217,7 +226,7 @@ Site.prototype = {
    */
   captureIfMissing: function Site_captureIfMissing() {
     if (!document.hidden && !this.link.imageURI) {
-      BackgroundPageThumbs.captureIfMissing(this.url);
+      sendAsyncMessage("NewTab:BackgroundPageThumbs", {url: this.url});
     }
   },
 
@@ -225,16 +234,19 @@ Site.prototype = {
    * Refreshes the thumbnail for the site.
    */
   refreshThumbnail: function Site_refreshThumbnail() {
+    sendAsyncMessage("NewTab:PageThumbs", {url: this.url});
+  },
+
+  _getURI: function Site_getURI(message) {
     // Only enhance tiles if that feature is turned on
-    let link = gAllPages.enhanced && DirectoryLinksProvider.getEnhancedLink(this.link) ||
-               this.link;
+    let link = message.data.enhanced && DirectoryLinksProvider.getEnhancedLink(this.link) || this.link;
 
     let thumbnail = this._querySelector(".newtab-thumbnail");
     if (link.bgColor) {
       thumbnail.style.backgroundColor = link.bgColor;
     }
 
-    let uri = link.imageURI || PageThumbs.getThumbnailURL(this.url);
+    let uri = this.link.imageURI || message.data.uri;
     thumbnail.style.backgroundImage = 'url("' + uri + '")';
 
     if (link.enhancedImageURI) {
@@ -265,6 +277,9 @@ Site.prototype = {
     this._node.addEventListener("dragstart", this, false);
     this._node.addEventListener("dragend", this, false);
     this._node.addEventListener("mouseover", this, false);
+
+    // Add message listener
+    addMessageListener("NewTab:URI", this._getURI.bind(this));
 
     // Specially treat the sponsored icon & suggested explanation
     // text to prevent regular hover effects
