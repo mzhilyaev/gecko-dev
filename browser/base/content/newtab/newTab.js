@@ -57,7 +57,10 @@ function registerEvents() {
 }
 
 function init() {
-  document.getElementById("meep").addEventListener("load", (e) => {
+  let remoteUrl = Services.prefs.getCharPref(PREF_REMOTE_NEWTAB_SOURCE);
+  let iframe = document.getElementById("meep");
+  iframe.setAttribute('src', remoteUrl);
+  iframe.addEventListener("load", (e) => {
     // since iframe contentDocument may be replaced by remote-page content,
     // we need to wait until "load" to attach events and message listeners
     registerEvents();
@@ -74,6 +77,7 @@ const XUL_NAMESPACE = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only
 const TILES_EXPLAIN_LINK = "https://support.mozilla.org/kb/how-do-tiles-work-firefox";
 const TILES_INTRO_LINK = "https://www.mozilla.org/firefox/tiles/";
 const TILES_PRIVACY_LINK = "https://www.mozilla.org/privacy/";
+const PREF_REMOTE_NEWTAB_SOURCE = "browser.newtabpage.remote.source";
 
 #include transformations.js
 const REGISTERED_EVENTS = ["NewTab:FetchLinks", "NewTab:URI", "NewTab:UpdatePages",
