@@ -57,8 +57,15 @@ function registerEvents() {
 }
 
 function init() {
-  registerEvents();
-  initRemotePage();
+  document.getElementById("meep").addEventListener("load", (e) => {
+    // since iframe contentDocument may be replaced by remote-page content,
+    // we need to wait until "load" to attach events and message listeners
+    registerEvents();
+    initRemotePage();
+    // let the content script know that message channel is ready
+    document.getElementById("meep").
+             contentDocument.dispatchEvent(new CustomEvent("NewTabCommandReady"));
+  });
 }
 
 const HTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
