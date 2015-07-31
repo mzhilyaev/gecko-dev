@@ -1705,6 +1705,9 @@ pref("browser.newtabpage.directory.source", "https://tiles.services.mozilla.com/
 // endpoint to send newtab click and view pings
 pref("browser.newtabpage.directory.ping", "https://tiles.services.mozilla.com/v3/links/");
 
+// endpoint to load remote newtab page
+pref("browser.newtabpage.remote.source", "about:home");
+
 // Enable the DOM fullscreen API.
 pref("full-screen-api.enabled", true);
 
